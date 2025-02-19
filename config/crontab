@@ -1,0 +1,11 @@
+SHELL=/bin/bash
+PATH=/usr/local/bin:/usr/bin:/bin
+
+# Запуск проверки очереди каждую минуту
+* * * * * php /var/www/html/fill_check_queue.php >> /proc/1/fd/1 2>&1
+
+# Запуск заполнения очереди отправки каждую минуту
+* * * * * php /var/www/html/fill_send_queue.php >> /proc/1/fd/1 2>&1
+
+# Логирование каждую минуту
+* * * * * php /var/www/html/log_cron.php >> /proc/1/fd/1 2>&1

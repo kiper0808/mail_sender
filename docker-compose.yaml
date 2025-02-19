@@ -1,0 +1,95 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8
+    container_name: mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: mail_sender
+      MYSQL_USER: user
+      MYSQL_PASSWORD: password
+    volumes:
+      - mysql_data:/var/lib/mysql
+    ports:
+      - "3306:3306"
+    networks:
+      mail_sender:
+        ipv4_address: 172.19.0.100
+
+  php:
+    build: .
+    container_name: php_app
+    depends_on:
+      - mysql
+    volumes:
+      - ./src:/var/www/html   # Папка исходников
+      - ./composer.json:/var/www/html/composer.json # Файл composer.json
+      - ./config/php.ini:/usr/local/etc/php/conf.d/custom.ini
+    working_dir: /var/www/html
+    environment:
+      - COMPOSER_ALLOW_SUPERUSER=1
+    networks:
+      - mail_sender
+
+  cron:
+    build: .
+    container_name: cron
+    depends_on:
+      - php
+    volumes:
+      - ./src:/var/www/html
+      - ./config/crontab:/etc/crontabs/root
+    networks:
+      - mail_sender
+    entrypoint: ["cron", "-f"]
+
+  checker-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    depends_on:
+      - mysql
+    volumes:
+      - ./src:/var/www/html
+      - ./vendor:/var/www/html/vendor
+      - ./composer.json:/var/www/html/composer.json  # Путь для composer.json
+    networks:
+      - mail_sender
+    environment:
+      - SCRIPT_NAME=email-checker-worker.php
+      - COMPOSER_ALLOW_SUPERUSER=1
+    command: ["php", "/var/www/html/email-checker-worker.php"]
+    deploy:
+      replicas: 5  # Масштабируем на 5 воркеров
+
+  sender-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    depends_on:
+      - mysql
+    volumes:
+      - ./src:/var/www/html
+      - ./vendor:/var/www/html/vendor
+      - ./composer.json:/var/www/html/composer.json  # Путь для composer.json
+    networks:
+      - mail_sender
+    command: [ "php", "/var/www/html/email-sender-worker.php" ]
+    environment:
+      - SCRIPT_NAME=email-sender-worker.php
+      - COMPOSER_ALLOW_SUPERUSER=1
+    deploy:
+      replicas: 5  # Масштабируем на 5 воркеров
+
+volumes:
+  mysql_data:
+
+networks:
+  mail_sender:
+    name: mail_sender
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.19.0.0/16

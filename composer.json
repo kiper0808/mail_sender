@@ -1,0 +1,13 @@
+{
+  "require": {
+    "react/event-loop": "^1.5",
+    "react/promise": "^3.2",
+    "react/mysql": "^0.6.0",
+    "ext-pdo": "*"
+  },
+  "autoload": {
+    "psr-4": {
+      "App\\": "src/"
+    }
+  }
+}
